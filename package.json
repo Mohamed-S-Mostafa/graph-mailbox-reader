@@ -12,7 +12,8 @@
     }
   },
   "files": [
-    "src"
+    "src",
+    "AGENTS.md"
   ],
   "keywords": [
     "microsoft",
@@ -32,11 +33,11 @@
     "example": "node example/read-my-mailbox.js"
   },
   "dependencies": {
-    "@azure/msal-node": "^2.16.0",
+    "@azure/msal-node": "^5.3.0",
     "axios": "^1.6.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "repository": {
     "type": "git",

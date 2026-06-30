@@ -27,8 +27,8 @@ mailbox, that person signs in (their own `tokenCachePath` or `clientId`).
 
 ## Conventions
 
-- ESM only (`"type": "module"`), Node >= 18.
-- Only `src/` is published to npm (`files: ["src"]`).
+- ESM only (`"type": "module"`), Node >= 20.
+- Only `src/` and `AGENTS.md` are published to npm (`files: ["src", "AGENTS.md"]`).
 - Never commit `.env*` files or `*.token-cache.json` (refresh tokens).
 - Proprietary license — see [LICENSE](./LICENSE).
 

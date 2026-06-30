@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createMailboxReader } from "../src/index.js";
+import { toMessageQuery, scrubGraphError } from "../src/client.js";
 
 /**
  * Unit tests covering config validation and the Graph query construction that
@@ -27,28 +28,6 @@ describe("createMailboxReader() — config validation", () => {
   });
 });
 
-/**
- * Mirror of the private toMessageQuery() so we can assert the OData mapping
- * without exporting internals. Kept in lockstep with src/client.js.
- */
-function toMessageQuery({ top = 25, skip, search, filter, select, orderBy } = {}) {
-  const DEFAULT_MESSAGE_FIELDS = [
-    "id", "subject", "from", "toRecipients", "receivedDateTime",
-    "isRead", "hasAttachments", "bodyPreview", "webLink",
-  ];
-  const query = {};
-  query.$top = top;
-  if (skip) query.$skip = skip;
-  if (search) {
-    query.$search = `"${search}"`;
-  } else {
-    if (filter) query.$filter = filter;
-    if (orderBy) query.$orderby = orderBy;
-  }
-  query.$select = (select && select.length ? select : DEFAULT_MESSAGE_FIELDS).join(",");
-  return query;
-}
-
 describe("message query construction", () => {
   it("defaults to top=25 and the compact field projection", () => {
     const q = toMessageQuery();
@@ -74,5 +53,37 @@ describe("message query construction", () => {
   it("honours an explicit select list", () => {
     const q = toMessageQuery({ select: ["id", "subject"] });
     assert.equal(q.$select, "id,subject");
+  });
+});
+
+describe("scrubGraphError() — never leaks the access token", () => {
+  // Shape of a real AxiosError: the bearer token lives in config.headers.
+  const axiosLikeError = {
+    message: "Request failed with status code 401",
+    config: { headers: { Authorization: "Bearer SUPER-SECRET-TOKEN" } },
+    response: {
+      status: 401,
+      data: { error: { code: "InvalidAuthenticationToken", message: "Access token expired." } },
+    },
+  };
+
+  it("strips the request config (and thus the bearer token)", () => {
+    const clean = scrubGraphError(axiosLikeError, "/me/messages");
+    assert.equal(clean.config, undefined);
+    assert.equal(JSON.stringify(clean).includes("SUPER-SECRET-TOKEN"), false);
+    assert.equal(clean.message.includes("SUPER-SECRET-TOKEN"), false);
+  });
+
+  it("preserves the useful Graph diagnostics", () => {
+    const clean = scrubGraphError(axiosLikeError, "/me/messages");
+    assert.equal(clean.status, 401);
+    assert.equal(clean.code, "InvalidAuthenticationToken");
+    assert.match(clean.message, /Graph 401 on \/me\/messages: Access token expired\./);
+  });
+
+  it("falls back gracefully when there is no response body", () => {
+    const clean = scrubGraphError({ message: "timeout of 30000ms exceeded" }, "/me");
+    assert.match(clean.message, /Graph request error on \/me: timeout of 30000ms exceeded/);
+    assert.equal(clean.status, undefined);
   });
 });

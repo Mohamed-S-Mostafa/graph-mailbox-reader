@@ -3,6 +3,9 @@ import { createTokenProvider } from "./auth.js";
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 
+/** Per-request timeout (ms) so a hung Graph call can't block forever. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /**
  * Fields returned for message list/detail by default. Keeping this explicit
  * keeps payloads small and predictable; override per call via `select`.
@@ -18,6 +21,51 @@ const DEFAULT_MESSAGE_FIELDS = [
   "bodyPreview",
   "webLink",
 ];
+
+/**
+ * Translate friendly list options into Graph OData query params. Exported for
+ * unit testing — not part of the public package surface (see src/index.js).
+ *
+ * @param {import("./index.js").ListMessagesOptions} [options]
+ * @returns {Record<string, string|number>}
+ */
+export function toMessageQuery({ top = 25, skip, search, filter, select, orderBy } = {}) {
+  const query = {};
+  query.$top = top;
+  if (skip) query.$skip = skip;
+  // $search cannot be combined with $filter/$orderby in Graph mail queries.
+  if (search) {
+    query.$search = `"${search}"`;
+  } else {
+    if (filter) query.$filter = filter;
+    if (orderBy) query.$orderby = orderBy;
+  }
+  query.$select = (select && select.length ? select : DEFAULT_MESSAGE_FIELDS).join(",");
+  return query;
+}
+
+/**
+ * Turn an axios/Graph failure into a plain Error that keeps the diagnostic
+ * details (status, Graph error code/message) but drops the request config so
+ * the bearer token in the `Authorization` header can never reach a log.
+ *
+ * Exported for unit testing — not part of the public package surface.
+ *
+ * @param {any} err - the caught error (usually an AxiosError)
+ * @param {string} pathName - the Graph path that was requested
+ * @returns {Error}
+ */
+export function scrubGraphError(err, pathName) {
+  const status = err?.response?.status;
+  const graphError = err?.response?.data?.error;
+  const detail = graphError?.message || err?.message || "request failed";
+  const code = graphError?.code ? ` (${graphError.code})` : "";
+  const prefix = status ? `Graph ${status}` : "Graph request error";
+  const clean = new Error(`${prefix} on ${pathName}: ${detail}${code}`);
+  if (status) clean.status = status;
+  if (graphError?.code) clean.code = graphError.code;
+  return clean;
+}
 
 /**
  * Create a mailbox reader bound to the signed-in user via delegated auth.
@@ -70,37 +118,29 @@ export function createMailboxReader({
    */
   async function graphGet(pathName, query) {
     const token = await tokens.getAccessToken();
-    const res = await axios.get(`${GRAPH_BASE}${pathName}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params: query,
-    });
-    return res.data;
-  }
-
-  /**
-   * Translate friendly list options into Graph OData query params.
-   *
-   * @param {ListMessagesOptions} [options]
-   * @returns {Record<string, string|number>}
-   */
-  function toMessageQuery({ top = 25, skip, search, filter, select, orderBy } = {}) {
-    const query = {};
-    query.$top = top;
-    if (skip) query.$skip = skip;
-    // $search cannot be combined with $filter/$orderby in Graph mail queries.
-    if (search) {
-      query.$search = `"${search}"`;
-    } else {
-      if (filter) query.$filter = filter;
-      if (orderBy) query.$orderby = orderBy;
+    try {
+      const res = await axios.get(`${GRAPH_BASE}${pathName}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: query,
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      return res.data;
+    } catch (err) {
+      // An AxiosError carries the request config — including the
+      // `Authorization: Bearer <token>` header — which leaks a live access
+      // token into any consumer that logs the raw error. Rethrow a clean
+      // error that preserves the useful Graph details but not the token.
+      throw scrubGraphError(err, pathName);
     }
-    query.$select = (select && select.length ? select : DEFAULT_MESSAGE_FIELDS).join(",");
-    return query;
   }
 
   /**
    * Ensure the user is signed in (device-code flow on first run) and return
-   * their account info.
+   * their account info. Blocks until sign-in completes.
+   *
+   * For a server that surfaces the device code over HTTP rather than the
+   * console, run this once at startup in the background and capture the code
+   * via `deviceCodeCallback`. See AGENTS.md ("E2E sign-in over HTTP").
    */
   async function signIn() {
     return tokens.signIn();

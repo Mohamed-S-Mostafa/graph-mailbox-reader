@@ -8,6 +8,11 @@ the signed-in user's own mailbox** via Microsoft Graph `/me`, using the OAuth
 npm install graph-mailbox-reader
 ```
 
+> **Integrating this into another project with an AI agent?** See
+> [AGENTS.md](./AGENTS.md) — a step-by-step playbook (Azure setup, env, code,
+> server pattern, troubleshooting) written for Claude/agents. It ships with the
+> package, so it's also at `node_modules/graph-mailbox-reader/AGENTS.md`.
+
 ## The one guarantee
 
 > The reader can only ever read the mailbox of the person who signed in.
@@ -93,7 +98,15 @@ await reader.signOut();                // clears cached account → fresh sign-i
 | `listMessages(options)` | `GET /me/messages` \| `GET /me/mailFolders/{folder}/messages` |
 | `getMessage(id, options)` | `GET /me/messages/{id}` |
 | `listFolders(options)` | `GET /me/mailFolders` |
-| `signIn()` / `signOut()` | device-code sign-in / clear cached account |
+| `signIn()` / `signOut()` | device-code sign-in (blocks) / clear cached account |
+
+### Sign-in over HTTP
+
+For a server that hands the device code back to the API caller (E2E testing,
+no console access), run `signIn()` in the background at startup and capture the
+code via `deviceCodeCallback`. See
+[AGENTS.md → "E2E sign-in over HTTP"](./AGENTS.md#e2e-sign-in-over-http-surface-the-device-code-through-the-api),
+with a runnable reference in `mailbox-test-server/server.js`.
 
 ## Architecture
 
