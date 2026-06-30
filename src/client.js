@@ -155,7 +155,9 @@ export function createMailboxReader({
   async function listFolders({ top = 50 } = {}) {
     return graphGet("/me/mailFolders", {
       $top: top,
-      $select: "id,displayName,wellKnownName,unreadItemCount,totalItemCount",
+      // Note: `wellKnownName` exists only on Graph's beta endpoint, not v1.0 —
+      // selecting it here returns 400. Match folders by displayName instead.
+      $select: "id,displayName,unreadItemCount,totalItemCount",
     });
   }
 
