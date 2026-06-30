@@ -1,0 +1,51 @@
+{
+  "name": "graph-mailbox-reader",
+  "version": "1.0.0",
+  "description": "Delegated-auth reader for a Microsoft 365 / Outlook mailbox. Reads ONLY the signed-in user's own mailbox via Microsoft Graph /me, using the OAuth 2.0 device-code flow. No client secret.",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "microsoft",
+    "microsoft-graph",
+    "outlook",
+    "office365",
+    "mailbox",
+    "email",
+    "mail-reader",
+    "msal",
+    "device-code",
+    "oauth",
+    "delegated"
+  ],
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "example": "node example/read-my-mailbox.js"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mohamed-S-Mostafa/graph-mailbox-reader.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mohamed-S-Mostafa/graph-mailbox-reader/issues"
+  },
+  "homepage": "https://github.com/Mohamed-S-Mostafa/graph-mailbox-reader#readme",
+  "author": "Mohamed S. Mostafa",
+  "license": "SEE LICENSE IN LICENSE"
+}

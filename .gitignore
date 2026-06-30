@@ -1,0 +1,16 @@
+node_modules/
+
+# Secrets / generated env files — never commit (the placeholder template is kept)
+.env
+.env.*
+!.env.example
+
+# Persisted MSAL token cache (contains refresh tokens — never commit)
+*.token-cache.json
+.mailbox-token-cache.json
+
+# Local-only Azure provisioning script + its generated env files (not shared)
+/scripts/
+
+# Local Claude session state
+.remember/
